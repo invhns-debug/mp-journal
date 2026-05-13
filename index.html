@@ -262,6 +262,7 @@ function HistoryView({sessions,onDelete}){
 function App(){
   const [tab,setTab]=useState("guide");
   const [sessions,setSessions]=useState([]);
+  const [imported,setImported]=useState(false);
 
   useEffect(()=>{
     try{const r=localStorage.getItem("mp_sessions");if(r)setSessions(JSON.parse(r));}catch(_){}
@@ -270,6 +271,36 @@ function App(){
   const persist=u=>{try{localStorage.setItem("mp_sessions",JSON.stringify(u));}catch(_){}setSessions(u);};
   const add=s=>persist([...sessions,{...s,id:Date.now().toString()}]);
   const del=id=>persist(sessions.filter(s=>s.id!==id));
+
+  const exportData=()=>{
+    const data={exported:new Date().toISOString(),sessions,version:"1.0"};
+    const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement("a");
+    a.href=url;
+    a.download=`mp-journal-${new Date().toISOString().split("T")[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const importData=e=>{
+    const file=e.target.files[0];
+    if(!file)return;
+    const reader=new FileReader();
+    reader.onload=ev=>{
+      try{
+        const data=JSON.parse(ev.target.result);
+        const imported=data.sessions||data;
+        if(Array.isArray(imported)){
+          persist(imported);
+          setImported(true);
+          setTimeout(()=>setImported(false),2500);
+        }
+      }catch(_){alert("Invalid file — please use an exported MP Journal JSON file.");}
+    };
+    reader.readAsText(file);
+    e.target.value="";
+  };
 
   const tabs=[{id:"guide",label:"How to Use",icon:"ti-info-circle"},{id:"new",label:"Log Session",icon:"ti-plus"},{id:"dashboard",label:"Dashboard",icon:"ti-chart-bar"},{id:"history",label:"History",icon:"ti-history"}];
 
@@ -280,8 +311,14 @@ function App(){
           <span style={{fontFamily:"JetBrains Mono",fontWeight:700,fontSize:14,color:"#00C9A7",letterSpacing:"0.04em"}}>MP JOURNAL</span>
           <span style={{fontSize:10,color:"#5A7080",fontFamily:"JetBrains Mono"}}>ES FUTURES</span>
         </div>
-        <div style={{display:"flex",gap:2}}>
+        <div style={{display:"flex",alignItems:"center",gap:2}}>
           {tabs.map(t=><button key={t.id} onClick={()=>setTab(t.id)} style={{background:tab===t.id?"#00C9A715":"transparent",border:"none",borderBottom:`2px solid ${tab===t.id?"#00C9A7":"transparent"}`,color:tab===t.id?"#00C9A7":"#5A7080",padding:"16px 12px 14px",fontSize:12,cursor:"pointer",fontFamily:"DM Sans",fontWeight:tab===t.id?600:400,display:"flex",alignItems:"center",gap:6}}><i className={`ti ${t.icon}`} style={{fontSize:14}}/>{t.label}</button>)}
+          <div style={{width:1,height:24,background:"#1E2D3D",margin:"0 8px"}}/>
+          <button onClick={exportData} title="Export data for Claude analysis" style={{background:"transparent",border:"1px solid #1E2D3D",borderRadius:6,color:"#5A7080",padding:"6px 10px",fontSize:11,cursor:"pointer",fontFamily:"JetBrains Mono",display:"flex",alignItems:"center",gap:5}}><i className="ti ti-download" style={{fontSize:13}}/>Export</button>
+          <label title="Import previously exported data" style={{background:"transparent",border:"1px solid #1E2D3D",borderRadius:6,color:imported?"#4CAF50":"#5A7080",padding:"6px 10px",fontSize:11,cursor:"pointer",fontFamily:"JetBrains Mono",display:"flex",alignItems:"center",gap:5}}>
+            <i className={`ti ${imported?"ti-check":"ti-upload"}`} style={{fontSize:13}}/>{imported?"Imported!":"Import"}
+            <input type="file" accept=".json" onChange={importData} style={{display:"none"}}/>
+          </label>
         </div>
       </div>
     </div>
