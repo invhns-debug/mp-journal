@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>MP Journal — ES Futures</title>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.47.0/tabler-icons.min.css"/>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0A0E13;color:#E2EAF0;font-family:'DM Sans',sans-serif}
+input,select,textarea{background:#162032;border:1px solid #1E2D3D;color:#E2EAF0;border-radius:6px;padding:8px 12px;font-size:13px;width:100%;font-family:'DM Sans',sans-serif;outline:none}
+input:focus,select:focus,textarea:focus{border-color:#00896F}
+select option{background:#111820}
+textarea{resize:vertical;min-height:72px}
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-track{background:#0A0E13}
+::-webkit-scrollbar-thumb{background:#1E2D3D;border-radius:2px}
+button{transition:all 0.15s}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState,useEffect}=React;
+
+const OPEN_TYPES=["Open Drive","Open Test Drive Up (Outside)","Open Test Drive Up (Inside)","Open Test Drive Down (Outside)","Open Test Drive Down (Inside)","ORR Up","ORR Down","Open Auction Out of Range","Open Auction In Range"];
+const DAY_TYPES=["Trend Day Up","Trend Day Down","Neutral Day","Neutral Extreme","NVD Up","NVD Down","Normal Day","Non-Trend Day","b-Profile","p-Profile","Double Distribution","Unfinished Neutral"];
+const OPEN_LOCS=["Inside VA","Outside Range Up","Outside Range Down","Near VAH","Near VAL","Inside Range (not VA)"];
+const IB_BREAKS=["Upside","Downside","Both Sides","None yet"];
+const VWAP_LOCS=["Above VWAP","Below VWAP","At VWAP"];
+const PLAYBOOK=["Yes — fully followed","Partial — some rules broken","No — ignored rules"];
+const RED_DAY_FACTORS=["Narrow range high volatile — overtraded","Open type prediction caused anxiety / early exit","Chased losses with big trade to recover","Low VIX (<16) — expected too large a range","Day before big data — should have stayed away","Traded RTH Globex area after missed targets","Carried Globex bias into RTH session"];
+const RULES_FOLLOWED=["Not traded 8–9pm","Not traded 11pm–10am","Not traded during IB","Took 30min break after big WIN/LOSS","Didn't give back after 6pm"];
+const RULES_BROKEN=["Traded during IB","Predicted day type before 6pm","Used high size (>4 micros)","Traded towards profile anomalies/HVNs","Exited profitable position early","Entered reversal in anticipation","Traded 8–9pm","Ignored volume filter","Revenge traded after loss","Predicted the close"];
+const EMPTY={date:new Date().toISOString().split("T")[0],volumePass:null,openLocation:"",ibSize:"",openType:"",ibBreak:"",vwapLocation:"",dayTypePredicted:"",dayTypeActual:"",playbookFollowed:"",redDayFactors:[],rulesBroken:[],rulesFollowed:[],pnlDollars:"",maxContracts:"",evalAccounts:"",fundedAccounts:"",trades:"",notes:""};
+const C={teal:"#00C9A7",tealDim:"#00896F",red:"#FF4D4D",amber:"#F5A623",green:"#4CAF50",bg:"#0A0E13",card:"#111820",border:"#1E2D3D",text:"#E2EAF0",muted:"#5A7080",accent:"#162032"};
+
+const Tag=({children,color=C.teal})=><span style={{background:color+"18",color,border:`1px solid ${color}40`,borderRadius:4,padding:"2px 8px",fontSize:11,fontFamily:"JetBrains Mono",fontWeight:500,whiteSpace:"nowrap"}}>{children}</span>;
+const Card=({children,style={}})=><div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:10,padding:"16px 20px",...style}}>{children}</div>;
+const Lbl=({children})=><div style={{fontSize:11,color:C.muted,fontFamily:"JetBrains Mono",marginBottom:6,textTransform:"uppercase",letterSpacing:"0.06em"}}>{children}</div>;
+const Sec=({title,children,accent=C.teal})=><div style={{marginBottom:24}}><div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}><div style={{width:3,height:16,background:accent,borderRadius:2}}/><span style={{fontSize:12,fontFamily:"JetBrains Mono",color:accent,fontWeight:700,letterSpacing:"0.08em"}}>{title}</span></div>{children}</div>;
+
+function Toggle({value,onChange,options}){
+  return <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>{options.map(o=>{const a=value===o.value,c=o.color||C.teal;return <button key={o.value} onClick={()=>onChange(o.value)} style={{background:a?c+"25":"transparent",border:`1px solid ${a?c:C.border}`,color:a?c:C.muted,borderRadius:6,padding:"6px 14px",fontSize:12,cursor:"pointer",fontFamily:"DM Sans",fontWeight:a?600:400}}>{o.label}</button>;})}</div>;
+}
+
+function Checks({options,selected,onChange,color=C.teal}){
+  const tog=v=>onChange(selected.includes(v)?selected.filter(x=>x!==v):[...selected,v]);
+  return <div style={{display:"flex",flexDirection:"column",gap:6}}>{options.map(o=>{const on=selected.includes(o);return(<label key={o} style={{display:"flex",alignItems:"flex-start",gap:10,cursor:"pointer"}}><div onClick={()=>tog(o)} style={{width:16,height:16,minWidth:16,borderRadius:4,marginTop:2,border:`1px solid ${on?color:C.border}`,background:on?color+"30":"transparent",display:"flex",alignItems:"center",justifyContent:"center"}}>{on&&<div style={{width:8,height:8,background:color,borderRadius:2}}/>}</div><span style={{fontSize:13,color:on?C.text:C.muted,lineHeight:1.4}}>{o}</span></label>);})}</div>;
+}
+
+function GuideView({onStart}){
+  const steps=[
+    {time:"Before open",color:C.teal,icon:"ti-clock",title:"Check volume first",body:"Is volume above 20-day relative volume? If NO, playbook is off. Log it and stand aside."},
+    {time:"3:00–3:30pm",color:C.amber,icon:"ti-eye",title:"Observe only",body:"Watch open location vs yesterday's VA. IB is still forming. Do NOT classify open type yet."},
+    {time:"3:30pm",color:C.teal,icon:"ti-flag",title:"IB closes — open type confirmed",body:"Classify open type in §03. Note IB size, which side broke, and where price is vs VWAP."},
+    {time:"During session",color:C.amber,icon:"ti-trending-up",title:"Trade — note deviations",body:"Follow your rules. Keep mental note of any rule you break. Don't log yet."},
+    {time:"End of day",color:C.green,icon:"ti-pencil",title:"Log the full session",body:"Fill all 7 sections. Be honest on self-audit. This is where the data value comes from."},
+    {time:"Weekly",color:C.teal,icon:"ti-chart-bar",title:"Review Dashboard",body:"After 10+ sessions: win rate by open type, playbook discipline impact, recurring triggers."},
+  ];
+  return <div style={{maxWidth:680}}>
+    <div style={{marginBottom:28}}>
+      <div style={{fontFamily:"JetBrains Mono",fontSize:18,color:C.teal,fontWeight:700,marginBottom:8}}>Market Profile Journal</div>
+      <div style={{fontSize:13,color:C.muted,lineHeight:1.7}}>Built from your playbook. Every field maps to a specific rule. After 30+ sessions the data shows exactly where your edge is strongest — and where you keep losing money.</div>
+    </div>
+    <div style={{marginBottom:28}}>{steps.map((s,i)=><div key={i} style={{display:"flex",gap:16,marginBottom:16}}>
+      <div style={{display:"flex",flexDirection:"column",alignItems:"center"}}>
+        <div style={{width:36,height:36,borderRadius:"50%",background:s.color+"20",border:`1px solid ${s.color}40`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><i className={`ti ${s.icon}`} style={{fontSize:16,color:s.color}}/></div>
+        {i<steps.length-1&&<div style={{width:1,flex:1,background:C.border,marginTop:6}}/>}
+      </div>
+      <div style={{paddingBottom:16}}>
+        <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:5}}><span style={{fontFamily:"JetBrains Mono",fontSize:11,color:s.color}}>{s.time}</span><span style={{fontSize:13,fontWeight:600,color:C.text}}>{s.title}</span></div>
+        <div style={{fontSize:12,color:C.muted,lineHeight:1.6}}>{s.body}</div>
+      </div>
+    </div>)}</div>
+    <Card style={{marginBottom:20}}>
+      <div style={{fontSize:11,color:C.muted,fontFamily:"JetBrains Mono",marginBottom:14,letterSpacing:"0.06em"}}>THE 7 SECTIONS IN LOG SESSION</div>
+      {[["§01 Gate Check","Volume filter — if this fails nothing else matters",C.teal],["§02 Open Context","Date, open location, IB size, break direction, VWAP",C.teal],["§03 Open Type","Confirmed at 3:30pm after IB closes — 9 options",C.teal],["§04 Day Type","What you predicted vs what actually developed",C.amber],["§05 Trade Result","P&L $, contracts, eval/funded accounts, playbook",C.green],["§06 Self Audit","Rules followed + red day factors + rules broken",C.red],["§07 Notes","Observations, lessons, what you'd do differently",C.muted]].map(([t,d,c])=><div key={t} style={{display:"flex",gap:12,alignItems:"flex-start",marginBottom:10,padding:"8px 10px",background:C.bg,borderRadius:6}}><span style={{fontFamily:"JetBrains Mono",fontSize:11,color:c,minWidth:100,paddingTop:1}}>{t}</span><span style={{fontSize:12,color:C.muted,lineHeight:1.5}}>{d}</span></div>)}
+    </Card>
+    <Card style={{background:C.red+"08",border:`1px solid ${C.red}25`,marginBottom:24}}>
+      <div style={{fontSize:11,color:C.red,fontFamily:"JetBrains Mono",marginBottom:10,letterSpacing:"0.06em"}}>THE NUMBER THAT WILL CHANGE HOW YOU TRADE</div>
+      <div style={{fontSize:13,color:C.text,lineHeight:1.7}}>After 20+ sessions compare <span style={{color:C.green,fontWeight:600}}>Playbook Followed win%</span> vs <span style={{color:C.red,fontWeight:600}}>Not Followed win%</span>. Your own numbers. No theory.</div>
+    </Card>
+    <button onClick={onStart} style={{width:"100%",padding:"14px 20px",background:C.teal+"20",border:`1px solid ${C.teal}`,borderRadius:8,color:C.teal,fontSize:14,fontWeight:600,cursor:"pointer",fontFamily:"JetBrains Mono",letterSpacing:"0.06em"}}>LOG TODAY'S SESSION →</button>
+  </div>;
+}
+
+function DashboardView({sessions}){
+  const total=sessions.length;
+  const withP=sessions.filter(s=>s.pnlDollars!=="");
+  const wins=withP.filter(s=>parseFloat(s.pnlDollars)>0).length;
+  const wr=withP.length?Math.round((wins/withP.length)*100):0;
+  const avg=withP.length?(withP.reduce((a,s)=>a+parseFloat(s.pnlDollars),0)/withP.length).toFixed(0):"—";
+  const pb0=sessions.filter(s=>s.playbookFollowed===PLAYBOOK[0]);
+  const pb2=sessions.filter(s=>s.playbookFollowed===PLAYBOOK[2]);
+  const r0=pb0.length?Math.round((pb0.filter(s=>parseFloat(s.pnlDollars)>0).length/pb0.length)*100):0;
+  const r2=pb2.length?Math.round((pb2.filter(s=>parseFloat(s.pnlDollars)>0).length/pb2.length)*100):0;
+  const totalPnl=withP.reduce((a,s)=>{const p=parseFloat(s.pnlDollars)||0,e=parseInt(s.evalAccounts)||0,f=parseInt(s.fundedAccounts)||0;return a+(p*(e+f||1));},0);
+  const byOT={};sessions.forEach(s=>{if(!s.openType)return;if(!byOT[s.openType])byOT[s.openType]={t:0,w:0};byOT[s.openType].t++;if(parseFloat(s.pnlDollars)>0)byOT[s.openType].w++;});
+  const rdC={};sessions.forEach(s=>(s.redDayFactors||[]).forEach(f=>{rdC[f]=(rdC[f]||0)+1;}));
+  const rbC={};sessions.forEach(s=>(s.rulesBroken||[]).forEach(f=>{rbC[f]=(rbC[f]||0)+1;}));
+  const rfC={};sessions.forEach(s=>(s.rulesFollowed||[]).forEach(f=>{rfC[f]=(rfC[f]||0)+1;}));
+  const topRD=Object.entries(rdC).sort((a,b)=>b[1]-a[1]).slice(0,3);
+  const topRB=Object.entries(rbC).sort((a,b)=>b[1]-a[1]).slice(0,3);
+  const topRF=Object.entries(rfC).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  if(total===0)return <div style={{textAlign:"center",padding:"60px 20px",color:C.muted}}><div style={{fontSize:36,marginBottom:16}}>📋</div><div style={{fontFamily:"JetBrains Mono",fontSize:13}}>No sessions logged yet</div><div style={{fontSize:12,marginTop:8}}>Go to Log Session to start</div></div>;
+  return <div>
+    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(110px,1fr))",gap:10,marginBottom:24}}>
+      {[["SESSIONS",total,C.teal],["WIN RATE",`${wr}%`,wr>=60?C.green:wr>=40?C.amber:C.red],["AVG P&L",avg==="—"?avg:`$${avg}`,parseFloat(avg)>0?C.green:C.red],["ALL ACCTS",totalPnl===0?"—":`${totalPnl>0?"+":""}$${Math.abs(Math.round(totalPnl)).toLocaleString()}`,totalPnl>0?C.green:C.red],["PB FOLLOW",pb0.length?`${r0}%`:"—",C.teal],["PB IGNORE",pb2.length?`${r2}%`:"—",C.red]].map(([l,v,c])=><div key={l} style={{background:C.accent,borderRadius:8,padding:"12px 14px",border:`1px solid ${C.border}`}}><div style={{fontSize:10,color:C.muted,fontFamily:"JetBrains Mono",marginBottom:6}}>{l}</div><div style={{fontSize:20,fontWeight:700,color:c,fontFamily:"JetBrains Mono"}}>{v}</div></div>)}
+    </div>
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:20}}>
+      <Card>
+        <div style={{fontSize:11,color:C.muted,fontFamily:"JetBrains Mono",marginBottom:12,letterSpacing:"0.06em"}}>WIN RATE BY OPEN TYPE</div>
+        {Object.keys(byOT).length===0?<div style={{color:C.muted,fontSize:12}}>No data yet</div>:Object.entries(byOT).sort((a,b)=>b[1].t-a[1].t).map(([type,d])=>{const w=d.t?Math.round((d.w/d.t)*100):0;const sh=type.replace("Open Test Drive","OTD").replace("Open Auction","OA").replace("Open Drive","OD").replace("Outside","Out").replace("Inside","In");return <div key={type} style={{marginBottom:10}}><div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span style={{fontSize:11,color:C.text}}>{sh}</span><span style={{fontSize:11,fontFamily:"JetBrains Mono",color:w>=60?C.green:w>=40?C.amber:C.red}}>{w}% · {d.t}x</span></div><div style={{background:C.border,borderRadius:2,height:4,overflow:"hidden"}}><div style={{width:`${w}%`,height:"100%",background:w>=60?C.green:w>=40?C.amber:C.red,borderRadius:2}}/></div></div>;})}
+      </Card>
+      <Card>
+        <div style={{fontSize:11,color:C.muted,fontFamily:"JetBrains Mono",marginBottom:12,letterSpacing:"0.06em"}}>AUDIT SUMMARY</div>
+        {topRD.length>0&&<><div style={{fontSize:10,color:C.red,fontFamily:"JetBrains Mono",marginBottom:8,letterSpacing:"0.04em"}}>RED DAY TRIGGERS</div>{topRD.map(([f,n])=><div key={f} style={{display:"flex",justifyContent:"space-between",gap:8,marginBottom:8,padding:"6px 10px",background:C.red+"10",borderRadius:6,border:`1px solid ${C.red}20`}}><span style={{fontSize:11,color:C.text,lineHeight:1.4}}>{f}</span><Tag color={C.red}>{n}x</Tag></div>)}</>}
+        {topRB.length>0&&<><div style={{fontSize:10,color:C.amber,fontFamily:"JetBrains Mono",marginBottom:8,marginTop:12,letterSpacing:"0.04em"}}>RULES BROKEN</div>{topRB.map(([f,n])=><div key={f} style={{display:"flex",justifyContent:"space-between",gap:8,marginBottom:8,padding:"6px 10px",background:C.amber+"10",borderRadius:6,border:`1px solid ${C.amber}20`}}><span style={{fontSize:11,color:C.text,lineHeight:1.4}}>{f}</span><Tag color={C.amber}>{n}x</Tag></div>)}</>}
+        {topRF.length>0&&<><div style={{fontSize:10,color:C.green,fontFamily:"JetBrains Mono",marginBottom:8,marginTop:12,letterSpacing:"0.04em"}}>RULES CONSISTENTLY FOLLOWED</div>{topRF.map(([f,n])=><div key={f} style={{display:"flex",justifyContent:"space-between",gap:8,marginBottom:8,padding:"6px 10px",background:C.green+"10",borderRadius:6,border:`1px solid ${C.green}20`}}><span style={{fontSize:11,color:C.text,lineHeight:1.4}}>{f}</span><Tag color={C.green}>{n}x</Tag></div>)}</>}
+        {topRD.length===0&&topRB.length===0&&topRF.length===0&&<div style={{color:C.muted,fontSize:12}}>No audit data yet</div>}
+      </Card>
+    </div>
+    <Card>
+      <div style={{fontSize:11,color:C.muted,fontFamily:"JetBrains Mono",marginBottom:12,letterSpacing:"0.06em"}}>PLAYBOOK DISCIPLINE IMPACT</div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10}}>
+        {[[PLAYBOOK[0],"Fully Followed",C.green],[PLAYBOOK[1],"Partial",C.amber],[PLAYBOOK[2],"Not Followed",C.red]].map(([pb,label,color])=>{const ss=sessions.filter(s=>s.playbookFollowed===pb);const w=ss.filter(s=>parseFloat(s.pnlDollars)>0).length;const r=ss.length?Math.round((w/ss.length)*100):0;const wp=ss.filter(s=>s.pnlDollars!=="");const av=wp.length?(wp.reduce((a,s)=>a+parseFloat(s.pnlDollars),0)/wp.length).toFixed(0):"—";return <div key={label} style={{background:C.bg,borderRadius:8,padding:"12px 14px",border:`1px solid ${color}30`}}><div style={{fontSize:10,color,fontFamily:"JetBrains Mono",marginBottom:8}}>{label.toUpperCase()}</div><div style={{fontSize:20,fontWeight:700,color,fontFamily:"JetBrains Mono"}}>{ss.length?`${r}%`:"—"}</div><div style={{fontSize:10,color:C.muted,marginTop:4}}>{ss.length} sessions · avg {av==="—"?av:`$${av}`}</div></div>;})}
+      </div>
+    </Card>
+  </div>;
+}
+
+function NewSessionView({onSave}){
+  const [form,setForm]=useState({...EMPTY,date:new Date().toISOString().split("T")[0]});
+  const [saved,setSaved]=useState(false);
+  const set=(k,v)=>setForm(f=>({...f,[k]:v}));
+  const ok=form.date&&form.openType&&form.dayTypeActual;
+  const save=()=>{if(!ok)return;onSave(form);setSaved(true);setTimeout(()=>{setForm({...EMPTY,date:new Date().toISOString().split("T")[0]});setSaved(false);},1800);};
+  const pc=form.pnlDollars===""?C.text:parseFloat(form.pnlDollars)>0?C.green:parseFloat(form.pnlDollars)<0?C.red:C.amber;
+  const ep=form.evalAccounts&&form.pnlDollars?parseFloat(form.pnlDollars)*parseInt(form.evalAccounts):null;
+  const fp=form.fundedAccounts&&form.pnlDollars?parseFloat(form.pnlDollars)*parseInt(form.fundedAccounts):null;
+  const tp=(ep||0)+(fp||0);
+  return <div style={{maxWidth:680}}>
+    <Sec title="§01 — GATE CHECK" accent={form.volumePass===false?C.red:C.teal}>
+      <Card>
+        <Lbl>Volume vs 20-Day Relative Volume</Lbl>
+        <Toggle value={form.volumePass===null?null:form.volumePass?"pass":"fail"} onChange={v=>set("volumePass",v==="pass")} options={[{value:"pass",label:"✓  Above 20-Day RV — Playbook Active",color:C.green},{value:"fail",label:"✗  Below 20-Day RV — Playbook OFF",color:C.red}]}/>
+        {form.volumePass===false&&<div style={{marginTop:12,background:C.red+"15",border:`1px solid ${C.red}30`,borderRadius:6,padding:"10px 14px",fontSize:12,color:C.red}}>⛔  Low volume day. Playbook does not apply. Long bias only. Max 5–10pts. No shorting.</div>}
+      </Card>
+    </Sec>
+    <Sec title="§02 — OPEN CONTEXT (3:30PM)" accent={C.teal}>
+      <Card style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
+        <div><Lbl>Date</Lbl><input type="date" value={form.date} onChange={e=>set("date",e.target.value)}/></div>
+        <div><Lbl>Open Location vs Yday</Lbl><select value={form.openLocation} onChange={e=>set("openLocation",e.target.value)}><option value="">Select...</option>{OPEN_LOCS.map(o=><option key={o}>{o}</option>)}</select></div>
+        <div><Lbl>IB Size (pts)</Lbl><input type="number" placeholder="e.g. 30" value={form.ibSize} onChange={e=>set("ibSize",e.target.value)}/></div>
+        <div><Lbl>IB Break</Lbl><select value={form.ibBreak} onChange={e=>set("ibBreak",e.target.value)}><option value="">Select...</option>{IB_BREAKS.map(o=><option key={o}>{o}</option>)}</select></div>
+        <div><Lbl>VWAP Location</Lbl><select value={form.vwapLocation} onChange={e=>set("vwapLocation",e.target.value)}><option value="">Select...</option>{VWAP_LOCS.map(o=><option key={o}>{o}</option>)}</select></div>
+      </Card>
+    </Sec>
+    <Sec title="§03 — OPEN TYPE (CONFIRMED AT 3:30PM)" accent={C.teal}>
+      <Card>
+        <Lbl>Open Type</Lbl>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+          {OPEN_TYPES.map(t=>{const a=form.openType===t;return <button key={t} onClick={()=>set("openType",t)} style={{background:a?C.teal+"20":"transparent",border:`1px solid ${a?C.teal:C.border}`,color:a?C.teal:C.muted,borderRadius:6,padding:"8px 12px",fontSize:11,cursor:"pointer",textAlign:"left",fontFamily:"DM Sans",fontWeight:a?600:400,lineHeight:1.4}}>{t}</button>;})}
+        </div>
+      </Card>
+    </Sec>
+    <Sec title="§04 — DAY TYPE" accent={C.amber}>
+      <Card style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
+        <div><Lbl>Day Type Predicted</Lbl><select value={form.dayTypePredicted} onChange={e=>set("dayTypePredicted",e.target.value)}><option value="">Select...</option>{DAY_TYPES.map(d=><option key={d}>{d}</option>)}</select></div>
+        <div><Lbl>Day Type Actual (end of day)</Lbl><select value={form.dayTypeActual} onChange={e=>set("dayTypeActual",e.target.value)}><option value="">Select...</option>{DAY_TYPES.map(d=><option key={d}>{d}</option>)}</select></div>
+      </Card>
+    </Sec>
+    <Sec title="§05 — TRADE RESULT" accent={C.green}>
+      <Card style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:16}}>
+        <div><Lbl>P&L ($) per Account</Lbl><input type="number" placeholder="+500 or -200" value={form.pnlDollars} onChange={e=>set("pnlDollars",e.target.value)} style={{color:pc,fontFamily:"JetBrains Mono",fontWeight:600,fontSize:15}}/></div>
+        <div><Lbl>Max Contracts</Lbl><input type="number" min="0" placeholder="e.g. 4" value={form.maxContracts} onChange={e=>set("maxContracts",e.target.value)}/></div>
+        <div><Lbl>Number of Trades</Lbl><input type="number" min="0" placeholder="e.g. 2" value={form.trades} onChange={e=>set("trades",e.target.value)}/></div>
+        <div><Lbl>Eval Accounts</Lbl><input type="number" min="0" placeholder="e.g. 2" value={form.evalAccounts} onChange={e=>set("evalAccounts",e.target.value)}/></div>
+        <div><Lbl>Funded Accounts</Lbl><input type="number" min="0" placeholder="e.g. 1" value={form.fundedAccounts} onChange={e=>set("fundedAccounts",e.target.value)}/></div>
+        <div><Lbl>Playbook Followed?</Lbl><select value={form.playbookFollowed} onChange={e=>set("playbookFollowed",e.target.value)}><option value="">Select...</option>{PLAYBOOK.map(p=><option key={p}>{p}</option>)}</select></div>
+      </Card>
+      {form.pnlDollars!==""&&(form.evalAccounts||form.fundedAccounts)&&<div style={{marginTop:12,background:C.teal+"10",border:`1px solid ${C.teal}30`,borderRadius:8,padding:"12px 16px",display:"flex",gap:24,flexWrap:"wrap"}}>
+        {ep!==null&&<div><div style={{fontSize:10,color:C.muted,fontFamily:"JetBrains Mono",marginBottom:4}}>EVAL TOTAL</div><div style={{fontSize:18,fontWeight:700,fontFamily:"JetBrains Mono",color:ep>0?C.green:C.red}}>{ep>0?"+":""}<span style={{fontSize:12}}>$</span>{Math.abs(ep).toLocaleString()}</div></div>}
+        {fp!==null&&<div><div style={{fontSize:10,color:C.muted,fontFamily:"JetBrains Mono",marginBottom:4}}>FUNDED TOTAL</div><div style={{fontSize:18,fontWeight:700,fontFamily:"JetBrains Mono",color:fp>0?C.green:C.red}}>{fp>0?"+":""}<span style={{fontSize:12}}>$</span>{Math.abs(fp).toLocaleString()}</div></div>}
+        {ep!==null&&fp!==null&&<div><div style={{fontSize:10,color:C.muted,fontFamily:"JetBrains Mono",marginBottom:4}}>SESSION TOTAL</div><div style={{fontSize:18,fontWeight:700,fontFamily:"JetBrains Mono",color:tp>0?C.green:C.red}}>{tp>0?"+":""}<span style={{fontSize:12}}>$</span>{Math.abs(tp).toLocaleString()}</div></div>}
+      </div>}
+    </Sec>
+    <Sec title="§06 — SELF AUDIT" accent={C.red}>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:16}}>
+        <Card><Lbl>✅ Rules Followed</Lbl><Checks options={RULES_FOLLOWED} selected={form.rulesFollowed} onChange={v=>set("rulesFollowed",v)} color={C.green}/></Card>
+        <Card><Lbl>⚠️ Red Day Factors</Lbl><Checks options={RED_DAY_FACTORS} selected={form.redDayFactors} onChange={v=>set("redDayFactors",v)} color={C.red}/></Card>
+        <Card><Lbl>🔴 Rules Broken</Lbl><Checks options={RULES_BROKEN} selected={form.rulesBroken} onChange={v=>set("rulesBroken",v)} color={C.amber}/></Card>
+      </div>
+    </Sec>
+    <Sec title="§07 — NOTES" accent={C.muted}>
+      <Card><Lbl>Notes / Observations / Lessons</Lbl><textarea placeholder="What did you observe? What worked? What will you do differently?" value={form.notes} onChange={e=>set("notes",e.target.value)}/></Card>
+    </Sec>
+    <button onClick={save} disabled={!ok} style={{width:"100%",padding:"14px 20px",background:saved?C.green+"25":C.teal+"20",border:`1px solid ${saved?C.green:C.teal}`,borderRadius:8,color:saved?C.green:C.teal,fontSize:14,fontWeight:600,cursor:"pointer",fontFamily:"JetBrains Mono",letterSpacing:"0.06em",opacity:ok?1:0.4}}>
+      {saved?"✓  SESSION SAVED":"SAVE SESSION"}
+    </button>
+  </div>;
+}
+
+function HistoryView({sessions,onDelete}){
+  const [filter,setFilter]=useState("all");
+  const fil=filter==="all"?sessions:filter==="win"?sessions.filter(s=>parseFloat(s.pnlDollars)>0):filter==="loss"?sessions.filter(s=>parseFloat(s.pnlDollars)<0):filter==="pb"?sessions.filter(s=>s.playbookFollowed===PLAYBOOK[0]):sessions.filter(s=>(s.redDayFactors||[]).length>0);
+  const sorted=[...fil].sort((a,b)=>new Date(b.date)-new Date(a.date));
+  return <div>
+    <div style={{display:"flex",gap:8,marginBottom:20,flexWrap:"wrap"}}>
+      {[["all","All"],["win","Wins ↑"],["loss","Losses ↓"],["pb","Playbook ✓"],["red","Red Day"]].map(([v,l])=><button key={v} onClick={()=>setFilter(v)} style={{background:filter===v?C.teal+"20":"transparent",border:`1px solid ${filter===v?C.teal:C.border}`,color:filter===v?C.teal:C.muted,borderRadius:6,padding:"6px 14px",fontSize:12,cursor:"pointer"}}>{l}</button>)}
+    </div>
+    {sorted.length===0?<div style={{textAlign:"center",padding:40,color:C.muted,fontSize:13}}>No sessions match</div>:sorted.map(s=>{
+      const pnl=s.pnlDollars!==""?parseFloat(s.pnlDollars):null;
+      const pc=pnl===null?C.muted:pnl>0?C.green:pnl<0?C.red:C.amber;
+      const called=s.dayTypePredicted&&s.dayTypePredicted===s.dayTypeActual;
+      const ea=s.evalAccounts?parseInt(s.evalAccounts):0;
+      const fa=s.fundedAccounts?parseInt(s.fundedAccounts):0;
+      return <Card key={s.id} style={{marginBottom:12}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:12}}>
+          <div style={{flex:1}}>
+            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10,flexWrap:"wrap"}}>
+              <span style={{fontFamily:"JetBrains Mono",fontSize:13,color:C.teal,fontWeight:700}}>{s.date}</span>
+              {s.volumePass===false&&<Tag color={C.red}>LOW VOL</Tag>}
+              {s.openType&&<Tag color={C.teal}>{s.openType.replace("Open Test Drive","OTD").replace("Open Auction","OA").replace("Open Drive","OD")}</Tag>}
+              {s.dayTypeActual&&<Tag color={C.amber}>{s.dayTypeActual}</Tag>}
+              {s.playbookFollowed===PLAYBOOK[0]&&<Tag color={C.green}>PB ✓</Tag>}
+              {s.playbookFollowed===PLAYBOOK[2]&&<Tag color={C.red}>PB ✗</Tag>}
+              {called&&<Tag color={C.green}>CALLED ✓</Tag>}
+            </div>
+            <div style={{display:"flex",gap:16,flexWrap:"wrap",marginBottom:6}}>
+              {s.ibSize&&<span style={{fontSize:11,color:C.muted}}>IB: <span style={{color:C.text}}>{s.ibSize}pts</span></span>}
+              {s.ibBreak&&<span style={{fontSize:11,color:C.muted}}>Break: <span style={{color:C.text}}>{s.ibBreak}</span></span>}
+              {s.trades&&<span style={{fontSize:11,color:C.muted}}>Trades: <span style={{color:C.text}}>{s.trades}</span></span>}
+              {s.maxContracts&&<span style={{fontSize:11,color:C.muted}}>Max: <span style={{color:C.text}}>{s.maxContracts} contracts</span></span>}
+              {s.vwapLocation&&<span style={{fontSize:11,color:C.muted}}>{s.vwapLocation}</span>}
+            </div>
+            {s.notes&&<div style={{marginTop:4,fontSize:12,color:C.muted,fontStyle:"italic",lineHeight:1.5}}>"{s.notes}"</div>}
+            {(s.rulesFollowed||[]).length>0&&<div style={{marginTop:8,display:"flex",gap:6,flexWrap:"wrap"}}>{(s.rulesFollowed||[]).map((r,i)=><Tag key={i} color={C.green}>{r}</Tag>)}</div>}
+            {(s.redDayFactors||[]).length>0&&<div style={{marginTop:6,display:"flex",gap:6,flexWrap:"wrap"}}>{(s.redDayFactors||[]).map((r,i)=><Tag key={i} color={C.red}>{r.slice(0,35)}</Tag>)}</div>}
+            {(s.rulesBroken||[]).length>0&&<div style={{marginTop:6,display:"flex",gap:6,flexWrap:"wrap"}}>{(s.rulesBroken||[]).map((r,i)=><Tag key={i} color={C.amber}>{r}</Tag>)}</div>}
+          </div>
+          <div style={{textAlign:"right",minWidth:70}}>
+            {pnl!==null&&<div style={{fontFamily:"JetBrains Mono",fontSize:20,fontWeight:700,color:pc}}>{pnl>0?"+":""}<span style={{fontSize:12}}>$</span>{Math.abs(pnl).toLocaleString()}</div>}
+            {pnl!==null&&(ea>0||fa>0)&&<div style={{marginTop:6,fontSize:10,color:C.muted,fontFamily:"JetBrains Mono",lineHeight:2}}>
+              {ea>0&&<div style={{color:pnl*ea>0?C.green:C.red}}>Eval {ea}x = {pnl*ea>0?"+":""}<span style={{fontSize:9}}>$</span>{Math.abs(pnl*ea).toLocaleString()}</div>}
+              {fa>0&&<div style={{color:pnl*fa>0?C.green:C.red}}>Fund {fa}x = {pnl*fa>0?"+":""}<span style={{fontSize:9}}>$</span>{Math.abs(pnl*fa).toLocaleString()}</div>}
+              {ea>0&&fa>0&&<div style={{color:pnl*(ea+fa)>0?C.green:C.red,borderTop:`1px solid ${C.border}`,paddingTop:2}}>Total = {pnl*(ea+fa)>0?"+":""}<span style={{fontSize:9}}>$</span>{Math.abs(pnl*(ea+fa)).toLocaleString()}</div>}
+            </div>}
+            <button onClick={()=>onDelete(s.id)} style={{marginTop:8,background:"transparent",border:`1px solid ${C.border}`,borderRadius:4,padding:"3px 8px",color:C.muted,cursor:"pointer",fontSize:10}}>del</button>
+          </div>
+        </div>
+      </Card>;
+    })}
+  </div>;
+}
+
+function App(){
+  const [tab,setTab]=useState("guide");
+  const [sessions,setSessions]=useState([]);
+
+  useEffect(()=>{
+    try{const r=localStorage.getItem("mp_sessions");if(r)setSessions(JSON.parse(r));}catch(_){}
+  },[]);
+
+  const persist=u=>{try{localStorage.setItem("mp_sessions",JSON.stringify(u));}catch(_){}setSessions(u);};
+  const add=s=>persist([...sessions,{...s,id:Date.now().toString()}]);
+  const del=id=>persist(sessions.filter(s=>s.id!==id));
+
+  const tabs=[{id:"guide",label:"How to Use",icon:"ti-info-circle"},{id:"new",label:"Log Session",icon:"ti-plus"},{id:"dashboard",label:"Dashboard",icon:"ti-chart-bar"},{id:"history",label:"History",icon:"ti-history"}];
+
+  return <>
+    <div style={{background:"#111820",borderBottom:"1px solid #1E2D3D",padding:"0 20px",position:"sticky",top:0,zIndex:10}}>
+      <div style={{maxWidth:720,margin:"0 auto",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+        <div style={{padding:"14px 0",display:"flex",alignItems:"baseline",gap:10}}>
+          <span style={{fontFamily:"JetBrains Mono",fontWeight:700,fontSize:14,color:"#00C9A7",letterSpacing:"0.04em"}}>MP JOURNAL</span>
+          <span style={{fontSize:10,color:"#5A7080",fontFamily:"JetBrains Mono"}}>ES FUTURES</span>
+        </div>
+        <div style={{display:"flex",gap:2}}>
+          {tabs.map(t=><button key={t.id} onClick={()=>setTab(t.id)} style={{background:tab===t.id?"#00C9A715":"transparent",border:"none",borderBottom:`2px solid ${tab===t.id?"#00C9A7":"transparent"}`,color:tab===t.id?"#00C9A7":"#5A7080",padding:"16px 12px 14px",fontSize:12,cursor:"pointer",fontFamily:"DM Sans",fontWeight:tab===t.id?600:400,display:"flex",alignItems:"center",gap:6}}><i className={`ti ${t.icon}`} style={{fontSize:14}}/>{t.label}</button>)}
+        </div>
+      </div>
+    </div>
+    <div style={{maxWidth:720,margin:"0 auto",padding:"24px 20px"}}>
+      {tab==="guide"?<GuideView onStart={()=>setTab("new")}/>:tab==="new"?<NewSessionView onSave={add}/>:tab==="dashboard"?<DashboardView sessions={sessions}/>:<HistoryView sessions={sessions} onDelete={del}/>}
+    </div>
+  </>;
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
