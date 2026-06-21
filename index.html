@@ -436,9 +436,9 @@ function App(){
         <div style={{display:"flex",alignItems:"center",gap:2}}>
           {tabs.map(t=><button key={t.id} onClick={()=>setTab(t.id)} style={{background:tab===t.id?"#00C9A715":"transparent",border:"none",borderBottom:`2px solid ${tab===t.id?"#00C9A7":"transparent"}`,color:tab===t.id?"#00C9A7":"#5A7080",padding:"16px 12px 14px",fontSize:12,cursor:"pointer",fontFamily:"DM Sans",fontWeight:tab===t.id?600:400,display:"flex",alignItems:"center",gap:6}}><i className={`ti ${t.icon}`} style={{fontSize:14}}/>{t.label}</button>)}
           <div style={{width:1,height:24,background:"#1E2D3D",margin:"0 8px"}}/>
-          <button onClick={exportData} title="Download journal backup" style={{background:"transparent",border:"1px solid #1E2D3D",borderRadius:6,color:"#5A7080",padding:"6px 10px",fontSize:11,cursor:"pointer",fontFamily:"JetBrains Mono",display:"flex",alignItems:"center",gap:5}}><i className="ti ti-download" style={{fontSize:13}}/>Export</button>
+          <button onClick={exportData} title="Download journal backup" style={{background:"transparent",border:"1px solid #1E2D3D",borderRadius:6,color:"#5A7080",padding:"6px 10px",fontSize:11,cursor:"pointer",fontFamily:"JetBrains Mono",display:"flex",alignItems:"center",gap:5}}><i className="ti ti-upload" style={{fontSize:13}}/>Export</button>
           <label title="Import from backup file" style={{background:"transparent",border:"1px solid #1E2D3D",borderRadius:6,color:imported?"#4CAF50":"#5A7080",padding:"6px 10px",fontSize:11,cursor:"pointer",fontFamily:"JetBrains Mono",display:"flex",alignItems:"center",gap:5}}>
-            <i className={`ti ${imported?"ti-check":"ti-upload"}`} style={{fontSize:13}}/>{imported?"Imported!":"Import"}
+            <i className={`ti ${imported?"ti-check":"ti-download"}`} style={{fontSize:13}}/>{imported?"Imported!":"Import"}
             <input type="file" accept=".json" onChange={importData} style={{display:"none"}}/>
           </label>
         </div>
