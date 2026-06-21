@@ -4,9 +4,9 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>MP Journal — ES Futures</title>
-<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://unpkg.com/react@18.2.0/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone@7.23.10/babel.min.js"></script>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.47.0/tabler-icons.min.css"/>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
 <style>
@@ -36,7 +36,7 @@ const PLAYBOOK=["Yes — fully followed","Partial — some rules broken","No —
 const RED_DAY_FACTORS=["Narrow range high volatile — overtraded","Open type prediction caused anxiety / early exit","Chased losses with big trade to recover","Low VIX (<16) — expected too large a range","Day before big data — should have stayed away","Traded RTH Globex area after missed targets","Carried Globex bias into RTH session"];
 const RULES_FOLLOWED=["Not traded 8–9pm","Not traded 11pm–10am","Not traded during IB","Took 30min break after big WIN/LOSS","Didn't give back after 6pm"];
 const RULES_BROKEN=["Traded during IB","Predicted day type before 6pm","Used high size (>4 micros)","Traded towards profile anomalies/HVNs","Exited profitable position early","Entered reversal in anticipation","Traded 8–9pm","Ignored volume filter","Revenge traded after loss","Predicted the close"];
-const EMPTY={date:new Date().toISOString().split("T")[0],volumePass:null,openLocation:"",ibSize:"",openType:"",ibBreak:"",vwapLocation:"",dayTypePredicted:"",dayTypeActual:"",playbookFollowed:"",redDayFactors:[],rulesBroken:[],rulesFollowed:[],pnlDollars:"",maxContracts:"",evalAccounts:"",fundedAccounts:"",trades:"",notes:""};
+const EMPTY={date:new Date().toISOString().split("T")[0],volumePass:null,openLocation:"",ibSize:"",openType:"",ibBreak:"",vwapLocation:"",dayTypePredicted:"",dayTypeActual:"",playbookFollowed:"",redDayFactors:[],rulesBroken:[],rulesFollowed:[],auditNotes:"",pnlEval:"",pnlFunded:"",maxContracts:"",evalAccounts:"",fundedAccounts:"",trades:"",notes:""};
 const C={teal:"#00C9A7",tealDim:"#00896F",red:"#FF4D4D",amber:"#F5A623",green:"#4CAF50",bg:"#0A0E13",card:"#111820",border:"#1E2D3D",text:"#E2EAF0",muted:"#5A7080",accent:"#162032"};
 
 const Tag=({children,color=C.teal})=><span style={{background:color+"18",color,border:`1px solid ${color}40`,borderRadius:4,padding:"2px 8px",fontSize:11,fontFamily:"JetBrains Mono",fontWeight:500,whiteSpace:"nowrap"}}>{children}</span>;
@@ -90,17 +90,18 @@ function GuideView({onStart}){
 }
 
 function DashboardView({sessions}){
+  const getTotal=s=>{const e=(parseFloat(s.pnlEval)||0)*(parseInt(s.evalAccounts)||0);const f=(parseFloat(s.pnlFunded)||0)*(parseInt(s.fundedAccounts)||0);return e+f;};
   const total=sessions.length;
-  const withP=sessions.filter(s=>s.pnlDollars!=="");
-  const wins=withP.filter(s=>parseFloat(s.pnlDollars)>0).length;
+  const withP=sessions.filter(s=>s.pnlEval!==""||s.pnlFunded!=="");
+  const wins=withP.filter(s=>getTotal(s)>0).length;
   const wr=withP.length?Math.round((wins/withP.length)*100):0;
-  const avg=withP.length?(withP.reduce((a,s)=>a+parseFloat(s.pnlDollars),0)/withP.length).toFixed(0):"—";
+  const avgTotal=withP.length?(withP.reduce((a,s)=>a+getTotal(s),0)/withP.length).toFixed(0):"—";
   const pb0=sessions.filter(s=>s.playbookFollowed===PLAYBOOK[0]);
   const pb2=sessions.filter(s=>s.playbookFollowed===PLAYBOOK[2]);
-  const r0=pb0.length?Math.round((pb0.filter(s=>parseFloat(s.pnlDollars)>0).length/pb0.length)*100):0;
-  const r2=pb2.length?Math.round((pb2.filter(s=>parseFloat(s.pnlDollars)>0).length/pb2.length)*100):0;
-  const totalPnl=withP.reduce((a,s)=>{const p=parseFloat(s.pnlDollars)||0,e=parseInt(s.evalAccounts)||0,f=parseInt(s.fundedAccounts)||0;return a+(p*(e+f||1));},0);
-  const byOT={};sessions.forEach(s=>{if(!s.openType)return;if(!byOT[s.openType])byOT[s.openType]={t:0,w:0};byOT[s.openType].t++;if(parseFloat(s.pnlDollars)>0)byOT[s.openType].w++;});
+  const r0=pb0.length?Math.round((pb0.filter(s=>getTotal(s)>0).length/pb0.length)*100):0;
+  const r2=pb2.length?Math.round((pb2.filter(s=>getTotal(s)>0).length/pb2.length)*100):0;
+  const grandTotal=sessions.reduce((a,s)=>a+getTotal(s),0);
+  const byOT={};sessions.forEach(s=>{if(!s.openType)return;if(!byOT[s.openType])byOT[s.openType]={t:0,w:0};byOT[s.openType].t++;if(getTotal(s)>0)byOT[s.openType].w++;});
   const rdC={};sessions.forEach(s=>(s.redDayFactors||[]).forEach(f=>{rdC[f]=(rdC[f]||0)+1;}));
   const rbC={};sessions.forEach(s=>(s.rulesBroken||[]).forEach(f=>{rbC[f]=(rbC[f]||0)+1;}));
   const rfC={};sessions.forEach(s=>(s.rulesFollowed||[]).forEach(f=>{rfC[f]=(rfC[f]||0)+1;}));
@@ -110,7 +111,7 @@ function DashboardView({sessions}){
   if(total===0)return <div style={{textAlign:"center",padding:"60px 20px",color:C.muted}}><div style={{fontSize:36,marginBottom:16}}>📋</div><div style={{fontFamily:"JetBrains Mono",fontSize:13}}>No sessions logged yet</div><div style={{fontSize:12,marginTop:8}}>Go to Log Session to start</div></div>;
   return <div>
     <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(110px,1fr))",gap:10,marginBottom:24}}>
-      {[["SESSIONS",total,C.teal],["WIN RATE",`${wr}%`,wr>=60?C.green:wr>=40?C.amber:C.red],["AVG P&L",avg==="—"?avg:`$${avg}`,parseFloat(avg)>0?C.green:C.red],["ALL ACCTS",totalPnl===0?"—":`${totalPnl>0?"+":""}$${Math.abs(Math.round(totalPnl)).toLocaleString()}`,totalPnl>0?C.green:C.red],["PB FOLLOW",pb0.length?`${r0}%`:"—",C.teal],["PB IGNORE",pb2.length?`${r2}%`:"—",C.red]].map(([l,v,c])=><div key={l} style={{background:C.accent,borderRadius:8,padding:"12px 14px",border:`1px solid ${C.border}`}}><div style={{fontSize:10,color:C.muted,fontFamily:"JetBrains Mono",marginBottom:6}}>{l}</div><div style={{fontSize:20,fontWeight:700,color:c,fontFamily:"JetBrains Mono"}}>{v}</div></div>)}
+      {[["SESSIONS",total,C.teal],["WIN RATE",`${wr}%`,wr>=60?C.green:wr>=40?C.amber:C.red],["AVG SESSION",avgTotal==="—"?avgTotal:`$${avgTotal}`,parseFloat(avgTotal)>0?C.green:C.red],["ALL ACCTS TOTAL",grandTotal===0?"—":`${grandTotal>0?"+":""}$${Math.abs(Math.round(grandTotal)).toLocaleString()}`,grandTotal>0?C.green:C.red],["PB FOLLOW",pb0.length?`${r0}%`:"—",C.teal],["PB IGNORE",pb2.length?`${r2}%`:"—",C.red]].map(([l,v,c])=><div key={l} style={{background:C.accent,borderRadius:8,padding:"12px 14px",border:`1px solid ${C.border}`}}><div style={{fontSize:10,color:C.muted,fontFamily:"JetBrains Mono",marginBottom:6}}>{l}</div><div style={{fontSize:20,fontWeight:700,color:c,fontFamily:"JetBrains Mono"}}>{v}</div></div>)}
     </div>
     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:20}}>
       <Card>
@@ -128,7 +129,7 @@ function DashboardView({sessions}){
     <Card>
       <div style={{fontSize:11,color:C.muted,fontFamily:"JetBrains Mono",marginBottom:12,letterSpacing:"0.06em"}}>PLAYBOOK DISCIPLINE IMPACT</div>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10}}>
-        {[[PLAYBOOK[0],"Fully Followed",C.green],[PLAYBOOK[1],"Partial",C.amber],[PLAYBOOK[2],"Not Followed",C.red]].map(([pb,label,color])=>{const ss=sessions.filter(s=>s.playbookFollowed===pb);const w=ss.filter(s=>parseFloat(s.pnlDollars)>0).length;const r=ss.length?Math.round((w/ss.length)*100):0;const wp=ss.filter(s=>s.pnlDollars!=="");const av=wp.length?(wp.reduce((a,s)=>a+parseFloat(s.pnlDollars),0)/wp.length).toFixed(0):"—";return <div key={label} style={{background:C.bg,borderRadius:8,padding:"12px 14px",border:`1px solid ${color}30`}}><div style={{fontSize:10,color,fontFamily:"JetBrains Mono",marginBottom:8}}>{label.toUpperCase()}</div><div style={{fontSize:20,fontWeight:700,color,fontFamily:"JetBrains Mono"}}>{ss.length?`${r}%`:"—"}</div><div style={{fontSize:10,color:C.muted,marginTop:4}}>{ss.length} sessions · avg {av==="—"?av:`$${av}`}</div></div>;})}
+        {[[PLAYBOOK[0],"Fully Followed",C.green],[PLAYBOOK[1],"Partial",C.amber],[PLAYBOOK[2],"Not Followed",C.red]].map(([pb,label,color])=>{const ss=sessions.filter(s=>s.playbookFollowed===pb);const w=ss.filter(s=>getTotal(s)>0).length;const r=ss.length?Math.round((w/ss.length)*100):0;const withPnl=ss.filter(s=>s.pnlEval!==""||s.pnlFunded!=="");const av=withPnl.length?(withPnl.reduce((a,s)=>a+getTotal(s),0)/withPnl.length).toFixed(0):"—";return <div key={label} style={{background:C.bg,borderRadius:8,padding:"12px 14px",border:`1px solid ${color}30`}}><div style={{fontSize:10,color,fontFamily:"JetBrains Mono",marginBottom:8}}>{label.toUpperCase()}</div><div style={{fontSize:20,fontWeight:700,color,fontFamily:"JetBrains Mono"}}>{ss.length?`${r}%`:"—"}</div><div style={{fontSize:10,color:C.muted,marginTop:4}}>{ss.length} sessions · avg {av==="—"?av:`$${av}`}</div></div>;})}
       </div>
     </Card>
   </div>;
@@ -140,10 +141,6 @@ function NewSessionView({onSave}){
   const set=(k,v)=>setForm(f=>({...f,[k]:v}));
   const ok=form.date&&form.openType&&form.dayTypeActual;
   const save=()=>{if(!ok)return;onSave(form);setSaved(true);setTimeout(()=>{setForm({...EMPTY,date:new Date().toISOString().split("T")[0]});setSaved(false);},1800);};
-  const pc=form.pnlDollars===""?C.text:parseFloat(form.pnlDollars)>0?C.green:parseFloat(form.pnlDollars)<0?C.red:C.amber;
-  const ep=form.evalAccounts&&form.pnlDollars?parseFloat(form.pnlDollars)*parseInt(form.evalAccounts):null;
-  const fp=form.fundedAccounts&&form.pnlDollars?parseFloat(form.pnlDollars)*parseInt(form.fundedAccounts):null;
-  const tp=(ep||0)+(fp||0);
   return <div style={{maxWidth:680}}>
     <Sec title="§01 — GATE CHECK" accent={form.volumePass===false?C.red:C.teal}>
       <Card>
@@ -177,17 +174,18 @@ function NewSessionView({onSave}){
     </Sec>
     <Sec title="§05 — TRADE RESULT" accent={C.green}>
       <Card style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:16}}>
-        <div><Lbl>P&L ($) per Account</Lbl><input type="number" placeholder="+500 or -200" value={form.pnlDollars} onChange={e=>set("pnlDollars",e.target.value)} style={{color:pc,fontFamily:"JetBrains Mono",fontWeight:600,fontSize:15}}/></div>
+        <div><Lbl>Eval P&L ($) per account</Lbl><input type="number" placeholder="+500 or -200" value={form.pnlEval} onChange={e=>set("pnlEval",e.target.value)} style={{color:form.pnlEval===""?C.text:parseFloat(form.pnlEval)>0?C.green:C.red,fontFamily:"JetBrains Mono",fontWeight:600,fontSize:15}}/></div>
+        <div><Lbl>Funded P&L ($) per account</Lbl><input type="number" placeholder="+500 or -200" value={form.pnlFunded} onChange={e=>set("pnlFunded",e.target.value)} style={{color:form.pnlFunded===""?C.text:parseFloat(form.pnlFunded)>0?C.green:C.red,fontFamily:"JetBrains Mono",fontWeight:600,fontSize:15}}/></div>
         <div><Lbl>Max Contracts</Lbl><input type="number" min="0" placeholder="e.g. 4" value={form.maxContracts} onChange={e=>set("maxContracts",e.target.value)}/></div>
         <div><Lbl>Number of Trades</Lbl><input type="number" min="0" placeholder="e.g. 2" value={form.trades} onChange={e=>set("trades",e.target.value)}/></div>
         <div><Lbl>Eval Accounts</Lbl><input type="number" min="0" placeholder="e.g. 2" value={form.evalAccounts} onChange={e=>set("evalAccounts",e.target.value)}/></div>
         <div><Lbl>Funded Accounts</Lbl><input type="number" min="0" placeholder="e.g. 1" value={form.fundedAccounts} onChange={e=>set("fundedAccounts",e.target.value)}/></div>
-        <div><Lbl>Playbook Followed?</Lbl><select value={form.playbookFollowed} onChange={e=>set("playbookFollowed",e.target.value)}><option value="">Select...</option>{PLAYBOOK.map(p=><option key={p}>{p}</option>)}</select></div>
+        <div style={{gridColumn:"1/-1"}}><Lbl>Playbook Followed?</Lbl><select value={form.playbookFollowed} onChange={e=>set("playbookFollowed",e.target.value)}><option value="">Select...</option>{PLAYBOOK.map(p=><option key={p}>{p}</option>)}</select></div>
       </Card>
-      {form.pnlDollars!==""&&(form.evalAccounts||form.fundedAccounts)&&<div style={{marginTop:12,background:C.teal+"10",border:`1px solid ${C.teal}30`,borderRadius:8,padding:"12px 16px",display:"flex",gap:24,flexWrap:"wrap"}}>
-        {ep!==null&&<div><div style={{fontSize:10,color:C.muted,fontFamily:"JetBrains Mono",marginBottom:4}}>EVAL TOTAL</div><div style={{fontSize:18,fontWeight:700,fontFamily:"JetBrains Mono",color:ep>0?C.green:C.red}}>{ep>0?"+":""}<span style={{fontSize:12}}>$</span>{Math.abs(ep).toLocaleString()}</div></div>}
-        {fp!==null&&<div><div style={{fontSize:10,color:C.muted,fontFamily:"JetBrains Mono",marginBottom:4}}>FUNDED TOTAL</div><div style={{fontSize:18,fontWeight:700,fontFamily:"JetBrains Mono",color:fp>0?C.green:C.red}}>{fp>0?"+":""}<span style={{fontSize:12}}>$</span>{Math.abs(fp).toLocaleString()}</div></div>}
-        {ep!==null&&fp!==null&&<div><div style={{fontSize:10,color:C.muted,fontFamily:"JetBrains Mono",marginBottom:4}}>SESSION TOTAL</div><div style={{fontSize:18,fontWeight:700,fontFamily:"JetBrains Mono",color:tp>0?C.green:C.red}}>{tp>0?"+":""}<span style={{fontSize:12}}>$</span>{Math.abs(tp).toLocaleString()}</div></div>}
+      {(form.pnlEval!==""||form.pnlFunded!=="")&&(form.evalAccounts||form.fundedAccounts)&&<div style={{marginTop:12,background:C.teal+"10",border:`1px solid ${C.teal}30`,borderRadius:8,padding:"12px 16px",display:"flex",gap:24,flexWrap:"wrap"}}>
+        {form.pnlEval!==""&&form.evalAccounts&&<div><div style={{fontSize:10,color:C.muted,fontFamily:"JetBrains Mono",marginBottom:4}}>EVAL TOTAL</div><div style={{fontSize:18,fontWeight:700,fontFamily:"JetBrains Mono",color:parseFloat(form.pnlEval)*parseInt(form.evalAccounts)>0?C.green:C.red}}>{parseFloat(form.pnlEval)*parseInt(form.evalAccounts)>0?"+":""}<span style={{fontSize:12}}>$</span>{Math.abs(parseFloat(form.pnlEval)*parseInt(form.evalAccounts)).toLocaleString()}</div></div>}
+        {form.pnlFunded!==""&&form.fundedAccounts&&<div><div style={{fontSize:10,color:C.muted,fontFamily:"JetBrains Mono",marginBottom:4}}>FUNDED TOTAL</div><div style={{fontSize:18,fontWeight:700,fontFamily:"JetBrains Mono",color:parseFloat(form.pnlFunded)*parseInt(form.fundedAccounts)>0?C.green:C.red}}>{parseFloat(form.pnlFunded)*parseInt(form.fundedAccounts)>0?"+":""}<span style={{fontSize:12}}>$</span>{Math.abs(parseFloat(form.pnlFunded)*parseInt(form.fundedAccounts)).toLocaleString()}</div></div>}
+        {form.pnlEval!==""&&form.pnlFunded!==""&&form.evalAccounts&&form.fundedAccounts&&<div><div style={{fontSize:10,color:C.muted,fontFamily:"JetBrains Mono",marginBottom:4}}>SESSION TOTAL</div><div style={{fontSize:18,fontWeight:700,fontFamily:"JetBrains Mono",color:(parseFloat(form.pnlEval)*parseInt(form.evalAccounts))+(parseFloat(form.pnlFunded)*parseInt(form.fundedAccounts))>0?C.green:C.red}}>{(parseFloat(form.pnlEval)*parseInt(form.evalAccounts))+(parseFloat(form.pnlFunded)*parseInt(form.fundedAccounts))>0?"+":""}<span style={{fontSize:12}}>$</span>{Math.abs((parseFloat(form.pnlEval)*parseInt(form.evalAccounts))+(parseFloat(form.pnlFunded)*parseInt(form.fundedAccounts))).toLocaleString()}</div></div>}
       </div>}
     </Sec>
     <Sec title="§06 — SELF AUDIT" accent={C.red}>
@@ -196,6 +194,7 @@ function NewSessionView({onSave}){
         <Card><Lbl>⚠️ Red Day Factors</Lbl><Checks options={RED_DAY_FACTORS} selected={form.redDayFactors} onChange={v=>set("redDayFactors",v)} color={C.red}/></Card>
         <Card><Lbl>🔴 Rules Broken</Lbl><Checks options={RULES_BROKEN} selected={form.rulesBroken} onChange={v=>set("rulesBroken",v)} color={C.amber}/></Card>
       </div>
+      <Card style={{marginTop:12}}><Lbl>📝 Audit Notes — What happened? What will you change?</Lbl><textarea placeholder="Free text — describe the key moment, what you were thinking, what you will do differently next time..." value={form.auditNotes} onChange={e=>set("auditNotes",e.target.value)}/></Card>
     </Sec>
     <Sec title="§07 — NOTES" accent={C.muted}>
       <Card><Lbl>Notes / Observations / Lessons</Lbl><textarea placeholder="What did you observe? What worked? What will you do differently?" value={form.notes} onChange={e=>set("notes",e.target.value)}/></Card>
@@ -208,15 +207,16 @@ function NewSessionView({onSave}){
 
 function HistoryView({sessions,onDelete}){
   const [filter,setFilter]=useState("all");
-  const fil=filter==="all"?sessions:filter==="win"?sessions.filter(s=>parseFloat(s.pnlDollars)>0):filter==="loss"?sessions.filter(s=>parseFloat(s.pnlDollars)<0):filter==="pb"?sessions.filter(s=>s.playbookFollowed===PLAYBOOK[0]):sessions.filter(s=>(s.redDayFactors||[]).length>0);
+  const fil=filter==="all"?sessions:filter==="win"?sessions.filter(s=>((parseFloat(s.pnlEval)||0)*(parseInt(s.evalAccounts)||0))+((parseFloat(s.pnlFunded)||0)*(parseInt(s.fundedAccounts)||0))>0):filter==="loss"?sessions.filter(s=>((parseFloat(s.pnlEval)||0)*(parseInt(s.evalAccounts)||0))+((parseFloat(s.pnlFunded)||0)*(parseInt(s.fundedAccounts)||0))<0):filter==="pb"?sessions.filter(s=>s.playbookFollowed===PLAYBOOK[0]):sessions.filter(s=>(s.redDayFactors||[]).length>0);
   const sorted=[...fil].sort((a,b)=>new Date(b.date)-new Date(a.date));
   return <div>
     <div style={{display:"flex",gap:8,marginBottom:20,flexWrap:"wrap"}}>
       {[["all","All"],["win","Wins ↑"],["loss","Losses ↓"],["pb","Playbook ✓"],["red","Red Day"]].map(([v,l])=><button key={v} onClick={()=>setFilter(v)} style={{background:filter===v?C.teal+"20":"transparent",border:`1px solid ${filter===v?C.teal:C.border}`,color:filter===v?C.teal:C.muted,borderRadius:6,padding:"6px 14px",fontSize:12,cursor:"pointer"}}>{l}</button>)}
     </div>
     {sorted.length===0?<div style={{textAlign:"center",padding:40,color:C.muted,fontSize:13}}>No sessions match</div>:sorted.map(s=>{
-      const pnl=s.pnlDollars!==""?parseFloat(s.pnlDollars):null;
-      const pc=pnl===null?C.muted:pnl>0?C.green:pnl<0?C.red:C.amber;
+      const evalPnl=s.pnlEval!==""&&s.evalAccounts?parseFloat(s.pnlEval)*parseInt(s.evalAccounts):null;
+      const fundPnl=s.pnlFunded!==""&&s.fundedAccounts?parseFloat(s.pnlFunded)*parseInt(s.fundedAccounts):null;
+      const totalPnl=(evalPnl||0)+(fundPnl||0);
       const called=s.dayTypePredicted&&s.dayTypePredicted===s.dayTypeActual;
       const ea=s.evalAccounts?parseInt(s.evalAccounts):0;
       const fa=s.fundedAccounts?parseInt(s.fundedAccounts):0;
@@ -244,13 +244,11 @@ function HistoryView({sessions,onDelete}){
             {(s.redDayFactors||[]).length>0&&<div style={{marginTop:6,display:"flex",gap:6,flexWrap:"wrap"}}>{(s.redDayFactors||[]).map((r,i)=><Tag key={i} color={C.red}>{r.slice(0,35)}</Tag>)}</div>}
             {(s.rulesBroken||[]).length>0&&<div style={{marginTop:6,display:"flex",gap:6,flexWrap:"wrap"}}>{(s.rulesBroken||[]).map((r,i)=><Tag key={i} color={C.amber}>{r}</Tag>)}</div>}
           </div>
-          <div style={{textAlign:"right",minWidth:70}}>
-            {pnl!==null&&<div style={{fontFamily:"JetBrains Mono",fontSize:20,fontWeight:700,color:pc}}>{pnl>0?"+":""}<span style={{fontSize:12}}>$</span>{Math.abs(pnl).toLocaleString()}</div>}
-            {pnl!==null&&(ea>0||fa>0)&&<div style={{marginTop:6,fontSize:10,color:C.muted,fontFamily:"JetBrains Mono",lineHeight:2}}>
-              {ea>0&&<div style={{color:pnl*ea>0?C.green:C.red}}>Eval {ea}x = {pnl*ea>0?"+":""}<span style={{fontSize:9}}>$</span>{Math.abs(pnl*ea).toLocaleString()}</div>}
-              {fa>0&&<div style={{color:pnl*fa>0?C.green:C.red}}>Fund {fa}x = {pnl*fa>0?"+":""}<span style={{fontSize:9}}>$</span>{Math.abs(pnl*fa).toLocaleString()}</div>}
-              {ea>0&&fa>0&&<div style={{color:pnl*(ea+fa)>0?C.green:C.red,borderTop:`1px solid ${C.border}`,paddingTop:2}}>Total = {pnl*(ea+fa)>0?"+":""}<span style={{fontSize:9}}>$</span>{Math.abs(pnl*(ea+fa)).toLocaleString()}</div>}
-            </div>}
+          <div style={{textAlign:"right",minWidth:85}}>
+            {evalPnl!==null&&<div style={{fontFamily:"JetBrains Mono",fontSize:12,color:evalPnl>0?C.green:C.red,marginBottom:3}}>{evalPnl>0?"+":""}<span style={{fontSize:10}}>$</span>{Math.abs(evalPnl).toLocaleString()}<span style={{fontSize:9,color:C.muted,marginLeft:3}}>eval</span></div>}
+            {fundPnl!==null&&<div style={{fontFamily:"JetBrains Mono",fontSize:12,color:fundPnl>0?C.green:C.red,marginBottom:3}}>{fundPnl>0?"+":""}<span style={{fontSize:10}}>$</span>{Math.abs(fundPnl).toLocaleString()}<span style={{fontSize:9,color:C.muted,marginLeft:3}}>fund</span></div>}
+            {(evalPnl!==null||fundPnl!==null)&&<div style={{fontFamily:"JetBrains Mono",fontSize:16,fontWeight:700,color:totalPnl>0?C.green:totalPnl<0?C.red:C.amber,borderTop:`1px solid ${C.border}`,paddingTop:4,marginTop:2}}>{totalPnl>0?"+":""}<span style={{fontSize:11}}>$</span>{Math.abs(totalPnl).toLocaleString()}</div>}
+            {s.auditNotes&&<div style={{marginTop:6,fontSize:10,color:C.amber,fontStyle:"italic",lineHeight:1.3,maxWidth:85}}>{s.auditNotes.slice(0,50)}{s.auditNotes.length>50?"…":""}</div>}
             <button onClick={()=>onDelete(s.id)} style={{marginTop:8,background:"transparent",border:`1px solid ${C.border}`,borderRadius:4,padding:"3px 8px",color:C.muted,cursor:"pointer",fontSize:10}}>del</button>
           </div>
         </div>
@@ -314,9 +312,9 @@ function App(){
         <div style={{display:"flex",alignItems:"center",gap:2}}>
           {tabs.map(t=><button key={t.id} onClick={()=>setTab(t.id)} style={{background:tab===t.id?"#00C9A715":"transparent",border:"none",borderBottom:`2px solid ${tab===t.id?"#00C9A7":"transparent"}`,color:tab===t.id?"#00C9A7":"#5A7080",padding:"16px 12px 14px",fontSize:12,cursor:"pointer",fontFamily:"DM Sans",fontWeight:tab===t.id?600:400,display:"flex",alignItems:"center",gap:6}}><i className={`ti ${t.icon}`} style={{fontSize:14}}/>{t.label}</button>)}
           <div style={{width:1,height:24,background:"#1E2D3D",margin:"0 8px"}}/>
-          <button onClick={exportData} title="Export data for Claude analysis" style={{background:"transparent",border:"1px solid #1E2D3D",borderRadius:6,color:"#5A7080",padding:"6px 10px",fontSize:11,cursor:"pointer",fontFamily:"JetBrains Mono",display:"flex",alignItems:"center",gap:5}}><i className="ti ti-download" style={{fontSize:13}}/>Export</button>
+          <button onClick={exportData} title="Export data for Claude analysis" style={{background:"transparent",border:"1px solid #1E2D3D",borderRadius:6,color:"#5A7080",padding:"6px 10px",fontSize:11,cursor:"pointer",fontFamily:"JetBrains Mono",display:"flex",alignItems:"center",gap:5}}><i className="ti ti-upload" style={{fontSize:13}}/>Export</button>
           <label title="Import previously exported data" style={{background:"transparent",border:"1px solid #1E2D3D",borderRadius:6,color:imported?"#4CAF50":"#5A7080",padding:"6px 10px",fontSize:11,cursor:"pointer",fontFamily:"JetBrains Mono",display:"flex",alignItems:"center",gap:5}}>
-            <i className={`ti ${imported?"ti-check":"ti-upload"}`} style={{fontSize:13}}/>{imported?"Imported!":"Import"}
+            <i className={`ti ${imported?"ti-check":"ti-download"}`} style={{fontSize:13}}/>{imported?"Imported!":"Import"}
             <input type="file" accept=".json" onChange={importData} style={{display:"none"}}/>
           </label>
         </div>
